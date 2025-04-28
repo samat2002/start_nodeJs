@@ -1,0 +1,29 @@
+{
+  "name": "start_nodejs",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/samat2002/start_nodeJs#readme",
+  "bugs": {
+    "url": "https://github.com/samat2002/start_nodeJs/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/samat2002/start_nodeJs.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "mysql2": "^3.14.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
