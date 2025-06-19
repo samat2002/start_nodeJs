@@ -1,116 +1,58 @@
-const express = require('express');
-const app = express();
-const bodyParser = require('body-parser');
-const cors = require('cors');
+const { Client, Collection, Events, GatewayIntentBits, MessageFlags } = require('discord.js');
+const fs = require('node:fs');
+const path = require('node:path');
 
-app.use(bodyParser.json());
-app.use(cors());
+const dotenv = require('dotenv');
+dotenv.config();
 
-const port = 8000
-const mysql = require('mysql2/promise')
+const token = process.env.BOT_TOKEN;
 
-let connection;
-const initMySQL = async () => {
-    connection = await mysql.createConnection({
-        host: 'localhost',
-        user: 'root',
-        password: 'root',
-        database: 'test',
-    });
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+client.commands = new Collection();
+
+const foldersPath = path.join(__dirname, 'commands');
+const commandFolders = fs.readdirSync(foldersPath);
+
+for (const folder of commandFolders) {
+    const commandsPath = path.join(foldersPath, folder);
+    const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+    for (const file of commandFiles) {
+        const filePath = path.join(commandsPath, file);
+        const command = require(filePath);
+        if ('data' in command && 'execute' in command) {
+            client.commands.set(command.data.name, command);
+        } else {
+            console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+        }
+    }
 }
 
-app.get('/users', async (req, res) => {
-    try {
-        const [result] = await connection.query('SELECT * FROM users');
-        res.json(result);
-    }
-    catch (error) {
-        res.status(500).json({
-            message: 'Error fetching users',
-            error: error.message
-        });
-    }
+client.once(Events.ClientReady, readyClient => {
+    console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 });
+client.on(Events.InteractionCreate, async interaction => {
+    console.log('⚡ Interaction received:', interaction.commandName);
 
-// let { name, age } = req.body;
-// const result = await connection.query('INSERT INTO users (name, age) VALUES (?, ?)', [name, age]);
-app.post('/users', async (req, res) => {
-    try {
-        let user = req.body;
-        const [result] = await connection.query('INSERT INTO users SET ?', user);
-        res.json({
-            massage: 'User created successfully',
-            user: result
-        });
-    }
-    catch (error) {
-        console.log("error massage: ", error.message);
-        res.status(500).json({
-            message: 'Error creating user',
-            // error: error.message
-        });
-    }
-});
+    if (!interaction.isChatInputCommand()) return;
 
-app.get('/users/:id', async (req, res) => {
+    const command = client.commands.get(interaction.commandName);
+
+    if (!command) {
+        console.error(`❌ No command matching ${interaction.commandName}`);
+        return;
+    }
+
     try {
-        let id = req.params.id;
-        const [result] = await connection.query('SELECT * FROM users where id = ?', id);//[id]
-        if (result.length === 0) {
-            // throw new Error("User not found");
-            return res.status(404).json({
-                message: 'User not found'
-            });
+        await command.execute(interaction);
+    } catch (error) {
+        console.error(`❌ Error executing ${interaction.commandName}:`, error);
+        if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({ content: 'Error running command.', ephemeral: true });
+        } else {
+            await interaction.reply({ content: 'Error running command.', ephemeral: true });
         }
-
-        res.json(result[0]);
-    }
-    catch (error) {
-        res.status(500).json({
-            message: 'Error fetching users',
-            error: error.message
-        });
     }
 });
 
-app.put('/users/:id', async (req, res) => {
-    try {
-        let id = req.params.id;
-        let user = req.body;
-        const [result] = await connection.query('UPDATE users SET ? WHERE id = ?', [user, id]);
-        res.json({
-            massage: 'User Updated successfully',
-            user: result
-        });
-    }
-    catch (error) {
-        console.log("error massage: ", error.message);
-        res.status(500).json({
-            message: 'Error creating user',
-            // error: error.message
-        });
-    }
-});
-
-app.delete('/users/:id', async (req, res) => {
-    try {
-        let id = req.params.id;
-        const [result] = await connection.query('DELETE FROM users  WHERE id = ?', [id]);
-        res.json({
-            massage: 'User deleted successfully',
-            user: result
-        });
-    }
-    catch (error) {
-        console.log("error massage: ", error.message);
-        res.status(500).json({
-            message: 'Error creating user',
-            // error: error.message
-        });
-    }
-});
-
-app.listen(port, async () => {
-    await initMySQL()
-    console.log(`Server is running on http://localhost:${port}`);
-});
+client.login(token);
