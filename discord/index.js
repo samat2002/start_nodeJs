@@ -1,13 +1,22 @@
 const { Client, Collection, Events, GatewayIntentBits, MessageFlags } = require('discord.js');
 const fs = require('node:fs');
 const path = require('node:path');
+const axios = require('axios');
 
 const dotenv = require('dotenv');
 dotenv.config();
 
 const token = process.env.BOT_TOKEN;
+const TARGET_CHANNEL_ID = process.env.CHANNEL_ID; // 👈 Set this to your target channel ID
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,   // ✅ Add this
+        GatewayIntentBits.MessageContent   // ✅ Add this (important!)
+    ]
+});
+
 
 client.commands = new Collection();
 
@@ -31,6 +40,29 @@ for (const folder of commandFolders) {
 client.once(Events.ClientReady, readyClient => {
     console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 });
+
+client.on('messageCreate', async (message) => {
+    if (message.channel.id !== TARGET_CHANNEL_ID) return; // 👈 Only listen to your target channel
+    if (message.author.bot) return;
+    if (message.attachments.size === 0) return;
+
+    for (const attachment of message.attachments.values()) {
+        if (attachment.contentType?.startsWith('image')) {
+            try {
+                await axios.post('http://localhost:8080/images', {
+                    user: message.author.username,
+                    image: attachment.url,
+                    filename: attachment.name,
+                    time: message.createdAt.toISOString()
+                });
+                console.log(`✅ Logged image from ${message.author.username}`);
+            } catch (err) {
+                console.error('❌ Failed to send image:', err.response?.data || err.message);
+            }
+        }
+    }
+});
+
 client.on(Events.InteractionCreate, async interaction => {
     console.log('⚡ Interaction received:', interaction.commandName);
 
